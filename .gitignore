@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+server/uploads/*
+!server/uploads/.gitkeep
+*.log
+.DS_Store
+
+# 本地随手记的凭据备忘，不提交
+/user

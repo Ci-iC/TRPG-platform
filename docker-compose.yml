@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: trpg-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trpg
+      POSTGRES_PASSWORD: trpg_pass
+      POSTGRES_DB: trpg
+    ports:
+      - "5500:5432"
+    volumes:
+      - trpg_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trpg -d trpg"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  trpg_pgdata:

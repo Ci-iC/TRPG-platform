@@ -1,0 +1,20 @@
+{
+  "name": "trpg-platform",
+  "version": "1.1.0",
+  "private": true,
+  "description": "在线跑团（TRPG）平台 - KP 主持 / 玩家实时跑团",
+  "scripts": {
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:migrate": "node server/src/migrate.js",
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "dev": "concurrently -n server,client -c blue,green \"npm:server\" \"npm:client\"",
+    "build": "npm --prefix client run build",
+    "start": "node server/src/index.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
