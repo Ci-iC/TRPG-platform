@@ -310,7 +310,21 @@ textarea { resize: vertical; }
 .offline { color: var(--muted); }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .attr-row { display: grid; grid-template-columns: 1fr 90px; gap: 8px; align-items: center; margin-bottom: 6px; }
+.attr-row.rollable { grid-template-columns: 1fr minmax(96px, 132px); }
 .attr-row .nm { font-size: 13px; }
+.attr-row .attr-val { display: flex; align-items: center; gap: 6px; }
+.attr-row .attr-val input { width: 100%; }
+/* 属性检定骰子按钮 */
+.roll-btn { flex: 0 0 auto; width: 28px; height: 30px; padding: 0; font-size: 15px; line-height: 1;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.roll-btn:hover:not(:disabled) { border-color: var(--gold); }
+.roll-btn:disabled { opacity: .4; cursor: not-allowed; }
+/* 检定结果分级配色 */
+.msg-dice.lv-crit    { color: var(--ok); font-weight: 600; }
+.msg-dice.lv-extreme { color: var(--gold); }
+.msg-dice.lv-hard    { color: var(--gold); }
+.msg-dice.lv-fail    { color: var(--muted); }
+.msg-dice.lv-fumble  { color: var(--danger); font-weight: 600; }
 img.uploaded-preview { max-width: 100%; max-height: 160px; border-radius: 8px; border: 1px solid var(--border); margin-top: 6px; }
 .upload-hint { color: var(--muted); font-size: 11px; margin-top: 4px; opacity: .8; }
 .toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 2000;

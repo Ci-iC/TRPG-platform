@@ -21,14 +21,16 @@ export default function PlayerView({ room, groupId, templateFields }) {
   const {
     snapshot, members, messages, scene, overlayChar, overlayFocus,
     gameState, muted, status, online, figures, cluesVer, invVer,
-    sendChat, rollDice,
+    sendChat, rollDice, rollCheck,
   } = room
 
   const me = snapshot.me
 
   const renderPanel = () => {
     switch (tool) {
-      case 'card': return <CharacterCardPanel groupId={groupId} templateFields={templateFields} />
+      case 'card': return <CharacterCardPanel groupId={groupId} templateFields={templateFields}
+        diceRule={snapshot.group.diceRule} rollCheck={rollCheck}
+        canRoll={status !== 'ended' && gameState === 'running'} />
       case 'bag': return <InventoryPanel groupId={groupId} members={members} me={me} invVer={invVer} />
       case 'clue': return <CluesPanel groupId={groupId} cluesVer={cluesVer} />
       case 'figure': return <FiguresPanel groupId={groupId} figures={figures} />

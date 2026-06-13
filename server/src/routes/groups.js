@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { one, many, query } from '../db.js'
 import { requireAuth, requireMember, requireKP } from '../middleware.js'
 import { emitToAccount, emitToGroup } from '../realtime.js'
+import { normalizeRule } from '../dice.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -52,12 +53,13 @@ router.get('/mine', async (req, res) => {
 
 // 开团：创建者自动成为 KP
 router.post('/', async (req, res) => {
-  const { name, intro, maxPlayers, templateId, cover } = req.body || {}
+  const { name, intro, maxPlayers, templateId, cover, diceRule } = req.body || {}
   if (!name) return res.status(400).json({ error: '团名必填' })
   const g = await one(
-    `INSERT INTO groups(name, intro, max_players, template_id, kp_id, cover)
-     VALUES($1,$2,$3,$4,$5,$6) RETURNING *`,
-    [name, intro || '', maxPlayers || 6, templateId || null, req.account.id, cover || null]
+    `INSERT INTO groups(name, intro, max_players, template_id, kp_id, cover, dice_rule)
+     VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    [name, intro || '', maxPlayers || 6, templateId || null, req.account.id, cover || null,
+     JSON.stringify(normalizeRule(diceRule))]
   )
   // KP 也写一条 membership 方便统一查询
   await query(
@@ -173,6 +175,7 @@ router.get('/:groupId', requireMember, async (req, res) => {
       currentScene,
       activeCharacter: g.active_character,
       activeFocus: g.active_focus,
+      diceRule: normalizeRule(g.dice_rule),
     },
     members,
     isKP: req.isKP,
@@ -185,6 +188,13 @@ router.post('/:groupId/cover', requireKP, async (req, res) => {
   const { cover } = req.body || {} // null = 清除
   await query('UPDATE groups SET cover=$1 WHERE id=$2', [cover || null, req.params.groupId])
   res.json({ ok: true })
+})
+
+// KP 修改骰点规则
+router.post('/:groupId/dice-rule', requireKP, async (req, res) => {
+  const rule = normalizeRule(req.body?.diceRule || req.body)
+  await query('UPDATE groups SET dice_rule=$1 WHERE id=$2', [JSON.stringify(rule), req.params.groupId])
+  res.json({ ok: true, diceRule: rule })
 })
 
 export default router

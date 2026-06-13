@@ -5,7 +5,7 @@ import { getSocket } from '../socket.js'
 import { useToast, Modal, ImageUpload } from '../components/ui.jsx'
 import Dialogue from './Dialogue.jsx'
 import Stage from './Stage.jsx'
-import { DicePanel } from './PlayerPanels.jsx'
+import { DicePanel, DiceRuleFields, DEFAULT_DICE_RULE } from './PlayerPanels.jsx'
 import { PlayerPanelKP, SceneTab, OverlayTab, NpcTab, ClueTab } from './KPPanels.jsx'
 import { JoinRequests } from '../pages/Lobby.jsx'
 
@@ -27,6 +27,8 @@ export default function KPConsole({ room, groupId, templateFields }) {
   const [showMore, setShowMore] = useState(false)
   const [showReqs, setShowReqs] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
+  const [showDice, setShowDice] = useState(false)
+  const [diceDraft, setDiceDraft] = useState(room.snapshot?.group?.diceRule || DEFAULT_DICE_RULE)
   const {
     snapshot, members, messages, scene, gameState, muted, status, online, figures,
     cluesVer, sendChat, rollDice, npcSpeak, reloadMembers,
@@ -90,6 +92,10 @@ export default function KPConsole({ room, groupId, templateFields }) {
                     <button style={{ width: '100%', marginBottom: 8 }}
                       onClick={() => { setShowMore(false); setCoverDraft(snapshot.group.cover || null); setShowCover(true) }}>
                       设置房间封面
+                    </button>
+                    <button style={{ width: '100%', marginBottom: 8 }}
+                      onClick={() => { setShowMore(false); setDiceDraft(snapshot.group.diceRule || DEFAULT_DICE_RULE); setShowDice(true) }}>
+                      骰点规则
                     </button>
                     <button className="danger" style={{ width: '100%' }}
                       onClick={() => { setShowMore(false); setShowEnd(true) }}>
@@ -160,6 +166,21 @@ export default function KPConsole({ room, groupId, templateFields }) {
               await control('cover', { cover: coverDraft }, '封面已更新')
               snapshot.group.cover = coverDraft
               setShowCover(false)
+            }}>保存</button>
+          </div>
+        </Modal>
+      )}
+
+      {showDice && (
+        <Modal title="骰点规则" onClose={() => setShowDice(false)} width={400}>
+          <DiceRuleFields rule={diceDraft} onChange={setDiceDraft} />
+          <div className="muted" style={{ fontSize: 11, marginTop: 8 }}>对全团生效，玩家点击属性旁的骰子按此规则检定。</div>
+          <div className="modal-actions">
+            <button className="ghost" onClick={() => setShowDice(false)}>取消</button>
+            <button className="primary" onClick={async () => {
+              await control('dice-rule', { diceRule: diceDraft }, '骰点规则已更新')
+              snapshot.group.diceRule = diceDraft
+              setShowDice(false)
             }}>保存</button>
           </div>
         </Modal>

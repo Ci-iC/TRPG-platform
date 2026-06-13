@@ -4,6 +4,7 @@ import api, { errMsg } from '../api.js'
 import { useAuth } from '../auth.jsx'
 import { getSocket } from '../socket.js'
 import { Modal, useToast, ImageUpload } from '../components/ui.jsx'
+import { DiceRuleFields, DEFAULT_DICE_RULE } from '../game/PlayerPanels.jsx'
 
 export default function Lobby() {
   const { account, logout } = useAuth()
@@ -221,6 +222,7 @@ function CreateGroup({ templates, onClose, onCreated }) {
   const [maxPlayers, setMaxPlayers] = useState(6)
   const [templateId, setTemplateId] = useState(templates[0]?.id || '')
   const [cover, setCover] = useState(null)
+  const [diceRule, setDiceRule] = useState(DEFAULT_DICE_RULE)
   const [busy, setBusy] = useState(false)
 
   const create = async () => {
@@ -229,7 +231,7 @@ function CreateGroup({ templates, onClose, onCreated }) {
     try {
       const { data } = await api.post('/groups', {
         name: name.trim(), intro, maxPlayers: Number(maxPlayers),
-        templateId: templateId || null, cover,
+        templateId: templateId || null, cover, diceRule,
       })
       onCreated(data)
     } catch (e) { toast(errMsg(e)) } finally { setBusy(false) }
@@ -256,6 +258,7 @@ function CreateGroup({ templates, onClose, onCreated }) {
           </select>
         </div>
       </div>
+      <DiceRuleFields rule={diceRule} onChange={setDiceRule} />
       <div className="modal-actions">
         <button className="ghost" onClick={onClose}>取消</button>
         <button className="primary" disabled={busy} onClick={create}>创建并进入</button>

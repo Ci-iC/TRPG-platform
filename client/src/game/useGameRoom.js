@@ -115,6 +115,7 @@ export function useGameRoom(groupId) {
   // ---- 动作 ----
   const sendChat = useCallback((mode, content) => emitAck('chat:send', { groupId, mode, content }), [groupId])
   const rollDice = useCallback((expr, hidden) => emitAck('dice:roll', { groupId, expr, hidden }), [groupId])
+  const rollCheck = useCallback((attrName, value) => emitAck('check:roll', { groupId, attrName, value }), [groupId])
   const npcSpeak = useCallback((npcId, content) => emitAck('npc:speak', { groupId, npcId, content }), [groupId])
 
   return {
@@ -122,6 +123,6 @@ export function useGameRoom(groupId) {
     gameState, muted, status, online, figures,
     error, cluesVer, invVer,
     setMessages, reloadFigures, reloadMembers,
-    sendChat, rollDice, npcSpeak,
+    sendChat, rollDice, rollCheck, npcSpeak,
   }
 }

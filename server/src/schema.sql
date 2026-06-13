@@ -150,6 +150,7 @@ CREATE TABLE IF NOT EXISTS clue_notes (
 -- 幂等迁移：为已存在的旧库补列（新库已含，ALTER 为空操作）
 ALTER TABLE items  ADD COLUMN IF NOT EXISTS image TEXT;
 ALTER TABLE groups ADD COLUMN IF NOT EXISTS cover TEXT;
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS dice_rule JSONB;  -- 骰点规则 {system,critMax,fumbleMin}
 
 -- 索引
 CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id, id);

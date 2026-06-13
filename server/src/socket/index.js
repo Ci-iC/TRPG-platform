@@ -2,7 +2,7 @@ import { verifyToken } from '../auth.js'
 import { one } from '../db.js'
 import { roomOf } from '../realtime.js'
 import { createMessage } from '../messages.js'
-import { rollExpression } from '../dice.js'
+import { rollExpression, rollCheck, normalizeRule, COC_LEVEL_LABEL } from '../dice.js'
 
 // 在线状态：groupId -> Map(accountId -> socket 数)
 const presence = new Map()
@@ -157,6 +157,31 @@ export function setupSocket(io) {
         meta: { expr: result.expr, detail: result.detail, total: result.total },
       })
       ack?.({ ok: true, total: result.total })
+    })
+
+    // 属性/技能检定：按该团骰点规则（COC/DND）判定，广播结果
+    socket.on('check:roll', async ({ groupId, attrName, value }, ack) => {
+      const ctx = await memberContext(groupId, socket.accountId)
+      if (!ctx) return ack?.({ error: '无权骰点' })
+      const { group, isKP } = ctx
+      if (!isKP && group.game_state !== 'running')
+        return ack?.({ error: '游戏未开始或已暂停' })
+      const num = Number(value)
+      if (!Number.isFinite(num)) return ack?.({ error: '该属性不是数值，无法检定' })
+
+      const rule = normalizeRule(group.dice_rule)
+      const r = rollCheck({ system: rule.system, value: num, critMax: rule.critMax, fumbleMin: rule.fumbleMin })
+      const tier = r.level ? ` → ${COC_LEVEL_LABEL[r.level]}` : ''
+      const name = String(attrName || '属性').slice(0, 20)
+      const content = `[检定] ${socket.username}「${name} ${r.value}」${r.detail}${tier}`
+      await createMessage(groupId, {
+        type: 'dice',
+        speakerName: socket.username,
+        content,
+        senderId: socket.accountId,
+        meta: { check: true, system: r.system, attrName: name, value: r.value, roll: r.roll, total: r.total, level: r.level },
+      })
+      ack?.({ ok: true, level: r.level, total: r.total })
     })
 
     socket.on('disconnect', () => {

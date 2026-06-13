@@ -2,12 +2,62 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import api, { errMsg } from '../api.js'
 import { useToast, Modal, ImageUpload } from '../components/ui.jsx'
 
+// ============ 骰点规则（开团 / KP 设置共用） ============
+export const DEFAULT_DICE_RULE = { system: 'coc', critMax: 1, fumbleMin: 100 }
+
+export function ruleLabel(rule) {
+  const r = rule || DEFAULT_DICE_RULE
+  if (r.system === 'dnd') return 'DND · d20+调整值，越大越好'
+  return `COC · d100 越小越好（大成功 ${r.critMax === 5 ? '1~5' : '1'}，大失败 ${r.fumbleMin === 96 ? '96~100' : '100'}）`
+}
+
+// 规则编辑控件（系统 + COC 的大成功/大失败范围）
+export function DiceRuleFields({ rule, onChange }) {
+  const r = rule || DEFAULT_DICE_RULE
+  const set = (patch) => onChange({ ...r, ...patch })
+  return (
+    <>
+      <label>骰点规则</label>
+      <select value={r.system} onChange={(e) => set({ system: e.target.value })}>
+        <option value="coc">COC · d100 越小越好（有大成功/大失败/困难/极难）</option>
+        <option value="dnd">DND · d20+调整值，越大越好（无大成功/大失败）</option>
+      </select>
+      {r.system === 'coc' && (
+        <div className="field-row">
+          <div>
+            <label>大成功范围</label>
+            <select value={r.critMax} onChange={(e) => set({ critMax: Number(e.target.value) })}>
+              <option value={1}>1</option>
+              <option value={5}>1 ~ 5</option>
+            </select>
+          </div>
+          <div>
+            <label>大失败范围</label>
+            <select value={r.fumbleMin} onChange={(e) => set({ fumbleMin: Number(e.target.value) })}>
+              <option value={100}>100</option>
+              <option value={96}>96 ~ 100</option>
+            </select>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+const isNumeric = (x) => x !== '' && x != null && Number.isFinite(Number(x))
+
 // ============ 角色卡 ============
-export function CharacterCardPanel({ groupId, templateFields }) {
+export function CharacterCardPanel({ groupId, templateFields, diceRule, rollCheck, canRoll = true }) {
   const toast = useToast()
   const [card, setCard] = useState({ name: '', portrait: null, attributes: {}, intro: '' })
   const [loaded, setLoaded] = useState(false)
   const fileRef = useRef(null)
+
+  const doCheck = async (name, value) => {
+    if (!isNumeric(value)) return toast('该属性不是数值，无法检定')
+    const res = await rollCheck(name, Number(value))
+    if (res?.error) toast(res.error)
+  }
 
   useEffect(() => {
     api.get(`/groups/${groupId}/my-character`).then(({ data }) => {
@@ -58,17 +108,28 @@ export function CharacterCardPanel({ groupId, templateFields }) {
       <label>立绘</label>
       <ImageUpload value={card.portrait} onChange={(url) => setCard({ ...card, portrait: url })} label="上传立绘" hint="建议 720×1280（竖图 9:16），透明背景 PNG 最佳" />
       <div className="section-title">属性</div>
+      <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>🎲 {ruleLabel(diceRule)}</div>
       {templateFields.length === 0 && <div className="muted" style={{ fontSize: 12 }}>该团未指定模板</div>}
-      {templateFields.map((f) => (
-        <div className="attr-row" key={f.name}>
-          <span className="nm">{f.name}{f.type === 'percent' ? ' (%)' : ''}</span>
-          {f.type === 'text' ? (
-            <input value={card.attributes[f.name] ?? f.default ?? ''} onChange={(e) => setAttr(f.name, e.target.value)} />
-          ) : (
-            <input type="number" value={card.attributes[f.name] ?? f.default ?? ''} onChange={(e) => setAttr(f.name, e.target.value)} />
-          )}
-        </div>
-      ))}
+      {templateFields.map((f) => {
+        const val = card.attributes[f.name] ?? f.default ?? ''
+        const numeric = f.type !== 'text'
+        return (
+          <div className={`attr-row ${numeric ? 'rollable' : ''}`} key={f.name}>
+            <span className="nm">{f.name}{f.type === 'percent' ? ' (%)' : ''}</span>
+            <div className="attr-val">
+              {numeric && rollCheck && (
+                <button className="roll-btn" type="button"
+                  title={canRoll ? `对「${f.name}」做检定` : '游戏未开始或已暂停'}
+                  disabled={!canRoll || !isNumeric(val)}
+                  onClick={() => doCheck(f.name, val)}>🎲</button>
+              )}
+              {numeric
+                ? <input type="number" value={val} onChange={(e) => setAttr(f.name, e.target.value)} />
+                : <input value={val} onChange={(e) => setAttr(f.name, e.target.value)} />}
+            </div>
+          </div>
+        )
+      })}
       <label>背景 / 备注</label>
       <textarea rows={3} value={card.intro} onChange={(e) => setCard({ ...card, intro: e.target.value })} />
       <div className="row" style={{ marginTop: 8 }}>

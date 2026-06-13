@@ -10,8 +10,10 @@ export default function MessageLine({ m }) {
       )
     case 'player_action':
       return <div className="msg-line msg-action">{m.speaker_name} {m.content}</div>
-    case 'dice':
-      return <div className="msg-line msg-dice">🎲 {m.content}</div>
+    case 'dice': {
+      const lv = m.meta?.level
+      return <div className={`msg-line msg-dice${lv ? ` lv-${lv}` : ''}`}>🎲 {m.content}</div>
+    }
     case 'broadcast':
       return <div className="msg-line msg-broadcast">📢 {m.content}</div>
     case 'scene_change':
