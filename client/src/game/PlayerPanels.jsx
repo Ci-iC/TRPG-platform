@@ -87,7 +87,12 @@ export function InventoryPanel({ groupId, members, me, invVer }) {
   const toast = useToast()
   const [items, setItems] = useState([])
   const [menu, setMenu] = useState(null) // {item}
+  const [moving, setMoving] = useState(null) // 触屏移动模式：待放置的 itemId（null=非移动态）
   const dragId = useRef(null)
+  // 触屏（粗指针）无右键/拖拽，启用点选式交互；桌面（细指针）走原左键拖拽 + 右键菜单，逻辑不变
+  const [isTouch] = useState(() =>
+    typeof window !== 'undefined' && !!window.matchMedia &&
+    window.matchMedia('(pointer: coarse)').matches)
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/groups/${groupId}/inventory`)
@@ -98,11 +103,34 @@ export function InventoryPanel({ groupId, members, me, invVer }) {
   const bySlot = {}
   items.forEach((it) => { bySlot[it.slot] = it })
 
-  const onDrop = async (slot) => {
-    const id = dragId.current; dragId.current = null
+  const doMove = async (id, slot) => {
     if (id == null) return
     try { setItems(await (await api.post(`/groups/${groupId}/inventory/move`, { itemId: id, slot })).data); }
     catch (e) { toast(errMsg(e)); load() }
+  }
+  const onDrop = (slot) => { const id = dragId.current; dragId.current = null; doMove(id, slot) }
+
+  // 触屏交互：长按物品=拿起进入移动态（震动反馈），短按=弹选项；移动态下点目标格=放下。
+  // 仅在触屏（粗指针）启用，桌面端走原左键拖拽 + 右键菜单，逻辑不变。
+  const lpTimer = useRef(null)
+  const lpFired = useRef(false)
+  const onTouchStart = (slot, it) => {
+    if (!isTouch) return
+    lpFired.current = false
+    clearTimeout(lpTimer.current)
+    if (moving != null || !it) return // 移动态中、或空格：不启动长按（落位交给 touchend）
+    lpTimer.current = setTimeout(() => {
+      lpFired.current = true
+      setMoving(it.id)
+      if (navigator.vibrate) navigator.vibrate(15)
+    }, 350)
+  }
+  const onTouchEnd = (slot, it) => {
+    if (!isTouch) return
+    clearTimeout(lpTimer.current)
+    if (lpFired.current) { lpFired.current = false; return } // 长按已激活拿起，本次抬手忽略
+    if (moving != null) { const id = moving; setMoving(null); doMove(id, slot); return } // 移动态：放下
+    if (it) setMenu({ item: it }) // 短按：弹选项
   }
 
   return (
@@ -110,16 +138,21 @@ export function InventoryPanel({ groupId, members, me, invVer }) {
       <div className="bag-grid">
         {Array.from({ length: SLOT_COUNT }).map((_, slot) => {
           const it = bySlot[slot]
+          const picking = moving != null && it && it.id === moving
+          const movable = moving != null && !picking
           return (
             <div
               key={slot}
-              className={`bag-slot ${it ? 'filled' : ''}`}
+              className={`bag-slot ${it ? 'filled' : ''} ${picking ? 'picking' : ''} ${movable ? 'movable' : ''}`}
               draggable={!!it}
               title={it ? `${it.name}\n${it.description || ''}` : ''}
               onDragStart={() => { if (it) dragId.current = it.id }}
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => onDrop(slot)}
-              onContextMenu={(e) => { e.preventDefault(); if (it) setMenu({ item: it }) }}
+              onContextMenu={(e) => { e.preventDefault(); if (!isTouch && it) setMenu({ item: it }) }}
+              onTouchStart={() => onTouchStart(slot, it)}
+              onTouchMove={() => clearTimeout(lpTimer.current)}
+              onTouchEnd={() => onTouchEnd(slot, it)}
             >
               {it && <>
                 {it.image && <img className="item-img" src={it.image} alt="" />}
@@ -130,7 +163,15 @@ export function InventoryPanel({ groupId, members, me, invVer }) {
           )
         })}
       </div>
-      <div className="muted" style={{ fontSize: 11, marginTop: 8 }}>左键拖拽整理 · 右键物品弹出菜单</div>
+      {moving != null ? (
+        <div className="muted" style={{ fontSize: 11, marginTop: 8 }}>
+          点击目标格子放置 · <button className="link-btn" onClick={() => setMoving(null)}>取消移动</button>
+        </div>
+      ) : (
+        <div className="muted" style={{ fontSize: 11, marginTop: 8 }}>
+          {isTouch ? '短按物品看详情/操作 · 长按拿起，再点空格放下' : '左键拖拽整理 · 右键物品弹出菜单'}
+        </div>
+      )}
 
       {menu && (
         <ItemMenu
@@ -144,56 +185,43 @@ export function InventoryPanel({ groupId, members, me, invVer }) {
 
 function ItemMenu({ groupId, item, members, me, onClose, onDone }) {
   const toast = useToast()
-  const [tab, setTab] = useState(null) // discard | transfer
   const [qty, setQty] = useState(1)
   const [target, setTarget] = useState('')
 
+  const clampQty = () => Math.min(item.quantity, Math.max(1, Number(qty) || 1))
   const discard = async () => {
-    try { await api.post(`/groups/${groupId}/inventory/discard`, { itemId: item.id, quantity: Number(qty) }); onDone() }
+    try { await api.post(`/groups/${groupId}/inventory/discard`, { itemId: item.id, quantity: clampQty() }); onDone() }
     catch (e) { toast(errMsg(e)) }
   }
   const transfer = async () => {
     if (!target) return toast('请选择队友')
-    try { await api.post(`/groups/${groupId}/inventory/transfer`, { itemId: item.id, quantity: Number(qty), toAccountId: Number(target) }); toast('已移交'); onDone() }
+    try { await api.post(`/groups/${groupId}/inventory/transfer`, { itemId: item.id, quantity: clampQty(), toAccountId: Number(target) }); toast('已移交'); onDone() }
     catch (e) { toast(errMsg(e)) }
   }
 
   const mates = members.filter((m) => m.id !== me.id)
+  // 描述与操作（丢弃 / 移交）同屏展示，无需二次切换
   return (
     <Modal title={item.name} onClose={onClose} width={340}>
       {item.image && <img src={item.image} alt="" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 8, marginBottom: 8, background: 'var(--bg)' }} />}
-      <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>{item.description || '（无描述）'} · 持有 ×{item.quantity}</div>
-      {!tab && (
-        <div className="row">
-          <button className="sm" onClick={() => setTab('discard')}>丢弃</button>
-          <button className="sm" onClick={() => setTab('transfer')}>移交队友</button>
-        </div>
-      )}
-      {tab === 'discard' && (
-        <>
-          <label>丢弃数量</label>
-          <input type="number" min={1} max={item.quantity} value={qty} onChange={(e) => setQty(e.target.value)} />
-          <div className="modal-actions">
-            <button className="ghost" onClick={onClose}>取消</button>
-            <button className="danger" onClick={discard}>确认丢弃</button>
-          </div>
-        </>
-      )}
-      {tab === 'transfer' && (
-        <>
-          <label>移交给</label>
-          <select value={target} onChange={(e) => setTarget(e.target.value)}>
-            <option value="">选择队友</option>
-            {mates.map((m) => <option key={m.id} value={m.id}>{m.username}{m.role === 'kp' ? '（KP）' : ''}</option>)}
-          </select>
-          <label>数量</label>
-          <input type="number" min={1} max={item.quantity} value={qty} onChange={(e) => setQty(e.target.value)} />
-          <div className="modal-actions">
-            <button className="ghost" onClick={onClose}>取消</button>
-            <button className="primary" onClick={transfer}>移交</button>
-          </div>
-        </>
-      )}
+      <div className="muted" style={{ fontSize: 12, marginBottom: 12 }}>{item.description || '（无描述）'} · 持有 ×{item.quantity}</div>
+
+      <label>数量</label>
+      <input type="number" min={1} max={item.quantity} value={qty} onChange={(e) => setQty(e.target.value)} />
+
+      <label style={{ marginTop: 12 }}>移交给队友</label>
+      <div className="row">
+        <select value={target} onChange={(e) => setTarget(e.target.value)} style={{ flex: 1 }}>
+          <option value="">选择队友…</option>
+          {mates.map((m) => <option key={m.id} value={m.id}>{m.username}{m.role === 'kp' ? '（KP）' : ''}</option>)}
+        </select>
+        <button className="primary" onClick={transfer}>移交</button>
+      </div>
+
+      <div className="modal-actions" style={{ marginTop: 14 }}>
+        <button className="ghost" onClick={onClose}>关闭</button>
+        <button className="danger" onClick={discard}>丢弃</button>
+      </div>
     </Modal>
   )
 }

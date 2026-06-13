@@ -239,9 +239,16 @@ textarea { resize: vertical; }
 .bag-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .bag-slot { aspect-ratio: 1; border: 1px dashed var(--border); border-radius: 8px; position: relative;
   display: flex; align-items: center; justify-content: center; font-size: 11px; text-align: center;
-  padding: 4px; cursor: grab; background: var(--bg); }
+  padding: 4px; cursor: grab; background: var(--bg);
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .bag-slot.filled { border-style: solid; background: var(--bg3); }
 .bag-slot.drag-over { border-color: var(--gold); }
+/* 触屏移动模式：被选中的物品高亮，其余格子提示可放置 */
+.bag-slot.picking { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); opacity: .85; }
+.bag-slot.movable { border-color: var(--gold); border-style: dashed; }
+/* 内联文字按钮（如“取消移动”） */
+.link-btn { background: none; border: none; padding: 0; color: var(--gold); cursor: pointer;
+  font-size: inherit; text-decoration: underline; }
 .bag-slot .qty { position: absolute; right: 3px; bottom: 2px; font-size: 10px; color: var(--gold); z-index: 1; }
 .bag-slot .nm { color: var(--text); overflow: hidden; }
 .bag-slot .item-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 7px; }
