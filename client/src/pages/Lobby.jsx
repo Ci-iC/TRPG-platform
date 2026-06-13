@@ -137,7 +137,7 @@ export default function Lobby() {
                     <span className="gc-count">👥 {g.member_count}/{g.max_players}</span>
                   </div>
                   <div className="gc-bar"><div className="gc-bar-fill" style={{ width: `${pct}%` }} /></div>
-                  {status === 'approved' ? (
+                  {isKP || status === 'approved' ? (
                     <div className="gc-actions">
                       <button className="primary" onClick={() => nav(`/game/${g.id}`)}>进入</button>
                       {isKP && g.pending_count > 0 && (
